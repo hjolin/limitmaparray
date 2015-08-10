@@ -6,20 +6,16 @@ import (
 	`math/rand`
 )
 
-func NewLimitMapArray(capacity int, sRule SelectRuler, cRule CoverRuler) *LimitMapArray {
+func NewLimitMapArray(capacity int, coverMaxTry int, sRule SelectRuler, cRule CoverRuler) *LimitMapArray {
 	if capacity > 0 {
 		array := &LimitMapArray{
-			index:      make(map[string]int),
-			capacity:   capacity,
-			freeIndexs: make([]int, capacity),
-			busyIndexs: make([]int, capacity),
-			elements:   make([]*element, capacity),
-			length:     0,
-			sRule:      sRule,
-			cRule:      cRule,
-		}
-		for i := 0; i < capacity; i++ {
-			array.freeIndexs[i] = i
+			index:       make(map[string]int),
+			capacity:    capacity,
+			length:      -1,
+			sRule:       sRule,
+			cRule:       cRule,
+			coverMaxTry: coverMaxTry,
+			elements:    make([]*element, capacity),
 		}
 		return array
 	}
@@ -27,14 +23,13 @@ func NewLimitMapArray(capacity int, sRule SelectRuler, cRule CoverRuler) *LimitM
 }
 
 type LimitMapArray struct {
-	index      map[string]int
-	capacity   int
-	length     int
-	freeIndexs []int
-	busyIndexs []int
-	sRule      SelectRuler
-	cRule      CoverRuler
-	elements   []*element
+	index       map[string]int
+	capacity    int
+	length      int
+	coverMaxTry int
+	sRule       SelectRuler
+	cRule       CoverRuler
+	elements    []*element
 }
 
 type element struct {
@@ -48,30 +43,28 @@ func (ra *LimitMapArray) Length() int {
 }
 
 func (ra *LimitMapArray) Set(key string, value interface{}) error {
-	if !ra.IsFull() {
-		idx := ra.freeIndexs[ra.capacity-ra.length-1]
-		ra.index[key] = idx
-		ra.busyIndexs[ra.length] = idx
-		ra.elements[idx] = &element{key, value}
-		ra.length++
-		return nil
-	} else {
-		var (
-			idx      int
-			tmpKey   string
-			tmpValue interface{}
-			try      int
-		)
-		for {
-			idx = rand.Intn(ra.length)
-			try++
-			tmpKey = ra.elements[idx].key
-			tmpValue = ra.elements[ra.index[tmpKey]].value
-			if try >= maxTry || ra.cRule == nil || ra.cRule.ShouldCover(tmpValue) {
-				ra.index[key] = idx
-				ra.elements[idx] = &element{key, value}
-				delete(ra.index, key)
-				return nil
+	if _, ok := ra.index[key]; !ok {
+		if !ra.IsFull() {
+			ra.length++
+			ra.index[key] = ra.length
+			ra.elements[ra.length] = &element{key, value}
+			return nil
+		} else {
+			var (
+				idx int
+				ele *element
+				try int
+			)
+			for {
+				idx = rand.Intn(ra.capacity)
+				try++
+				ele = ra.elements[idx]
+				if try >= ra.coverMaxTry || ra.cRule == nil || ra.cRule.ShouldCover(ele.value) {
+					delete(ra.index, ele.key)
+					ra.index[key] = idx
+					ra.elements[idx] = &element{key, value}
+					return nil
+				}
 			}
 		}
 	}
@@ -88,32 +81,40 @@ func (ra *LimitMapArray) Get(key string) interface{} {
 func (ra *LimitMapArray) Remove(key string) interface{} {
 	if idx, ok := ra.index[key]; ok {
 		value := ra.elements[idx].value
-		ra.freeIndexs[ra.capacity-ra.length] = idx
-		ra.length--
 		delete(ra.index, key)
+		if idx == ra.length {
+			ra.length--
+		} else {
+			last := ra.elements[ra.length]
+			ra.index[last.key] = idx
+			ra.elements[idx] = last
+			ra.length--
+		}
 		return value
 	}
 	return nil
 }
 
 func (ra *LimitMapArray) IsFull() bool {
-	return ra.length == ra.capacity
+	return ra.length == ra.capacity-1
 }
 
 func (ra *LimitMapArray) IsEmpty() bool {
+
 	return ra.length == 0
 }
 
 func (ra *LimitMapArray) RandomOne() interface{} {
+
 	idx := rand.Int31n(int32(ra.length))
-	return ra.elements[ra.busyIndexs[idx]].value
+	return ra.elements[idx].value
 }
 
 func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
-	if ra.length <= limit {
-		values := make([]interface{}, ra.length)
-		for i := 0; i < ra.length; i++ {
-			values[i] = ra.elements[ra.busyIndexs[i]].value
+	if ra.length < limit {
+		values := make([]interface{}, ra.length+1)
+		for i := 0; i <= ra.length; i++ {
+			values[i] = ra.elements[i].value
 		}
 		return values
 	} else {
@@ -128,9 +129,9 @@ func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
 		for i < limit {
 			idx = rand.Intn(ra.length)
 			try++
-			if _, ok = idxs[idx]; !ok && (ra.sRule == nil || ra.sRule.Check(ra.elements[ra.busyIndexs[idx]])) {
+			if _, ok = idxs[idx]; !ok && (ra.sRule == nil || ra.sRule.Check(ra.elements[idx].value)) {
 				idxs[idx] = '0'
-				values[i] = ra.elements[ra.busyIndexs[idx]]
+				values[i] = ra.elements[idx].value
 				i++
 			}
 			if try >= maxTry {
@@ -138,6 +139,13 @@ func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
 			}
 		}
 		return values
+	}
+}
+
+func (ra *LimitMapArray) Iterate() *Iterate {
+	return &Iterate{
+		cur:   0,
+		array: ra,
 	}
 }
 
@@ -149,10 +157,20 @@ type CoverRuler interface {
 	ShouldCover(interface{}) bool
 }
 
+type Iterate struct {
+	cur   int
+	array *LimitMapArray
+}
+
+func (it *Iterate) Next() interface{} {
+	if it.cur <= it.array.length {
+		value := it.array.elements[it.cur].value
+		it.cur++
+		return value
+	}
+	return nil
+}
+
 var (
 	SetFullAMapArrayErr = errors.New(`cannot set full map array`)
-)
-
-const (
-	maxTry = 128
 )

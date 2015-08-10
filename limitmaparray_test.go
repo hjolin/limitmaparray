@@ -3,20 +3,22 @@ package maparray
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
+	"sync"
 	"testing"
-	"time"
 )
 
 func TestMapArray(t *testing.T) {
-	ma := NewLimitMapArray(1001, nil, nil)
-	gorotines := 100000
+	ma := NewLimitMapArray(64, nil, nil)
+	gorotines := 10000
 	over := make(chan byte, 100)
+	lock := &sync.Mutex{}
 	for i := 0; i < gorotines; i++ {
 		go func(i int) {
-			time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+			//time.Sleep(time.Second * time.Duration(rand.Intn(5)))
+			lock.Lock()
 			ma.Set(strconv.FormatInt(int64(i), 10), i)
+			lock.Unlock()
 			over <- '0'
 		}(i)
 	}
@@ -26,12 +28,17 @@ func TestMapArray(t *testing.T) {
 		case <-over:
 			i++
 			if i == gorotines {
-				fmt.Println(ma.length)
-				for j := 0; j < ma.length; j++ {
-					fmt.Print(ma.elements[ma.busyIndexs[j]].key, `  `)
+				//				it := ma.Iterate()
+				for key := range ma.index {
+					fmt.Print(key, `  `)
+					ma.Remove(key)
 				}
-				ma.Remove(strconv.FormatInt(rand.Int63n(int64(gorotines)), 10))
-				fmt.Println(ma.Length(), `:`, len(ma.index))
+				fmt.Println()
+				fmt.Println(ma.Length(), ma.length)
+
+				for key := range ma.index {
+					fmt.Print(key, `  `)
+				}
 				return
 			}
 		}
