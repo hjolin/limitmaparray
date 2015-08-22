@@ -6,15 +6,14 @@ import (
 	`math/rand`
 )
 
-func NewLimitMapArray(capacity int, coverMaxTry int, sRule SelectRuler, cRule CoverRuler) *LimitMapArray {
+func NewLimitMapArray(capacity int, scalable bool) *LimitMapArray {
 	if capacity > 0 {
 		array := &LimitMapArray{
 			index:       make(map[string]int),
 			capacity:    capacity,
 			length:      -1,
-			sRule:       sRule,
-			cRule:       cRule,
-			coverMaxTry: coverMaxTry,
+			scalable: scalable,
+			coverMaxTry: CoverMaxTry,
 			elements:    make([]*element, capacity),
 		}
 		return array
@@ -27,6 +26,7 @@ type LimitMapArray struct {
 	capacity    int
 	length      int
 	coverMaxTry int
+	scalable bool
 	sRule       SelectRuler
 	cRule       CoverRuler
 	elements    []*element
@@ -37,8 +37,20 @@ type element struct {
 	value interface{}
 }
 
+func (ra *LimitMapArray) setSelectRuler(sRule SelectRuler) {
+	ra.sRule = sRule
+}
+
+func (ra *LimitMapArray) setCoverRuler(cRule CoverRuler) {
+	ra.cRule = cRule
+}
+
+func (ra *LimitMapArray) setCoverMaxTry(coverMaxTry int) {
+	ra.coverMaxTry = coverMaxTry
+}
+
+
 func (ra *LimitMapArray) Length() int {
-	// TODO bug
 	return len(ra.index)
 }
 
@@ -49,7 +61,15 @@ func (ra *LimitMapArray) Set(key string, value interface{}) error {
 			ra.index[key] = ra.length
 			ra.elements[ra.length] = &element{key, value}
 			return nil
-		} else {
+		} else if ra.scalable {
+			ra.capacity = ra.capacity << 1
+			var elements []*element = make([]*element, ra.capacity )
+			copy(elements, ra.elements)
+			ra.elements = elements
+			ra.length++
+			ra.index[key] = ra.length
+			ra.elements[ra.length] = &element{key, value}
+		} else{
 			var (
 				idx int
 				ele *element
@@ -71,11 +91,16 @@ func (ra *LimitMapArray) Set(key string, value interface{}) error {
 	return SetFullAMapArrayErr
 }
 
-func (ra *LimitMapArray) Get(key string) interface{} {
+func (ra *LimitMapArray) Get(key string) (interface{}, bool) {
 	if idx, ok := ra.index[key]; ok {
-		return ra.elements[idx].value
+		return ra.elements[idx].value, true
 	}
-	return nil
+	return nil, false
+}
+
+func (ra *LimitMapArray) Contains(key string) (bool) {
+	 _, ok := ra.index[key]
+	return ok
 }
 
 func (ra *LimitMapArray) Remove(key string) interface{} {
@@ -171,6 +196,9 @@ func (it *Iterate) Next() interface{} {
 	return nil
 }
 
+const (
+	CoverMaxTry = 16
+)
 var (
 	SetFullAMapArrayErr = errors.New(`cannot set full map array`)
 )

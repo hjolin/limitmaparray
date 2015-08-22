@@ -9,8 +9,8 @@ import (
 )
 
 func TestMapArray(t *testing.T) {
-	ma := NewLimitMapArray(64, nil, nil)
-	gorotines := 10000
+	ma := NewLimitMapArray(5, true)
+	gorotines := 100000
 	over := make(chan byte, 100)
 	lock := &sync.Mutex{}
 	for i := 0; i < gorotines; i++ {
@@ -30,12 +30,11 @@ func TestMapArray(t *testing.T) {
 			if i == gorotines {
 				//				it := ma.Iterate()
 				for key := range ma.index {
-					fmt.Print(key, `  `)
+					//fmt.Print(key, `  `)
 					ma.Remove(key)
 				}
 				fmt.Println()
 				fmt.Println(ma.Length(), ma.length)
-
 				for key := range ma.index {
 					fmt.Print(key, `  `)
 				}
