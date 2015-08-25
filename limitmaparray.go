@@ -37,15 +37,15 @@ type element struct {
 	value interface{}
 }
 
-func (ra *LimitMapArray) setSelectRuler(sRule SelectRuler) {
+func (ra *LimitMapArray) SetSelectRuler(sRule SelectRuler) {
 	ra.sRule = sRule
 }
 
-func (ra *LimitMapArray) setCoverRuler(cRule CoverRuler) {
+func (ra *LimitMapArray) SetCoverRuler(cRule CoverRuler) {
 	ra.cRule = cRule
 }
 
-func (ra *LimitMapArray) setCoverMaxTry(coverMaxTry int) {
+func (ra *LimitMapArray) SetCoverMaxTry(coverMaxTry int) {
 	ra.coverMaxTry = coverMaxTry
 }
 
