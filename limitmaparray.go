@@ -3,7 +3,6 @@ package maparray
 
 import (
 	"errors"
-	//	"fmt"
 	`math/rand`
 )
 
@@ -51,7 +50,7 @@ func (ra *LimitMapArray) SetCoverMaxTry(coverMaxTry int) {
 }
 
 func (ra *LimitMapArray) Length() int {
-	return len(ra.index)
+	return ra.length
 }
 
 func (ra *LimitMapArray) Set(key string, value interface{}) error {
@@ -107,10 +106,10 @@ func (ra *LimitMapArray) Remove(key string) interface{} {
 	if idx, ok := ra.index[key]; ok {
 		value := ra.elements[idx].value
 		delete(ra.index, key)
-		if idx == ra.length {
+		if idx == ra.length-1 {
 			ra.length--
 		} else {
-			last := ra.elements[ra.length]
+			last := ra.elements[ra.length-1]
 			ra.index[last.key] = idx
 			ra.elements[idx] = last
 			ra.length--
@@ -130,15 +129,14 @@ func (ra *LimitMapArray) IsEmpty() bool {
 }
 
 func (ra *LimitMapArray) RandomOne() interface{} {
-
 	idx := rand.Int31n(int32(ra.length))
 	return ra.elements[idx].value
 }
 
 func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
 	if ra.length < limit {
-		values := make([]interface{}, ra.length+1)
-		for i := 0; i <= ra.length; i++ {
+		values := make([]interface{}, ra.length)
+		for i := 0; i < ra.length; i++ {
 			values[i] = ra.elements[i].value
 		}
 		return values

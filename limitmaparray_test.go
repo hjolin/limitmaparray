@@ -34,7 +34,7 @@ func TestMapArray(t *testing.T) {
 				//	ma.Remove(key)
 				//}
 				//fmt.Println()
-				fmt.Println(ma.Length(), ma.length, len(ma.elements), len(ma.index))
+				fmt.Println(ma.Length())
 				for key := range ma.index {
 					fmt.Print(key, `  `)
 				}
