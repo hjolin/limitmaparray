@@ -3,6 +3,7 @@ package maparray
 
 import (
 	"errors"
+	//	"fmt"
 	`math/rand`
 )
 
@@ -11,8 +12,8 @@ func NewLimitMapArray(capacity int, scalable bool) *LimitMapArray {
 		array := &LimitMapArray{
 			index:       make(map[string]int),
 			capacity:    capacity,
-			length:      -1,
-			scalable: scalable,
+			length:      0,
+			scalable:    scalable,
 			coverMaxTry: CoverMaxTry,
 			elements:    make([]*element, capacity),
 		}
@@ -26,7 +27,7 @@ type LimitMapArray struct {
 	capacity    int
 	length      int
 	coverMaxTry int
-	scalable bool
+	scalable    bool
 	sRule       SelectRuler
 	cRule       CoverRuler
 	elements    []*element
@@ -49,7 +50,6 @@ func (ra *LimitMapArray) SetCoverMaxTry(coverMaxTry int) {
 	ra.coverMaxTry = coverMaxTry
 }
 
-
 func (ra *LimitMapArray) Length() int {
 	return len(ra.index)
 }
@@ -57,19 +57,17 @@ func (ra *LimitMapArray) Length() int {
 func (ra *LimitMapArray) Set(key string, value interface{}) error {
 	if _, ok := ra.index[key]; !ok {
 		if !ra.IsFull() {
-			ra.length++
 			ra.index[key] = ra.length
 			ra.elements[ra.length] = &element{key, value}
+			ra.length++
 			return nil
 		} else if ra.scalable {
 			ra.capacity = ra.capacity << 1
-			var elements []*element = make([]*element, ra.capacity )
-			copy(elements, ra.elements)
-			ra.elements = elements
-			ra.length++
+			ra.elements = append(ra.elements, ra.elements...)
 			ra.index[key] = ra.length
 			ra.elements[ra.length] = &element{key, value}
-		} else{
+			ra.length++
+		} else {
 			var (
 				idx int
 				ele *element
@@ -87,6 +85,8 @@ func (ra *LimitMapArray) Set(key string, value interface{}) error {
 				}
 			}
 		}
+	} else {
+		ra.elements[ra.index[key]].value = value
 	}
 	return SetFullAMapArrayErr
 }
@@ -98,8 +98,8 @@ func (ra *LimitMapArray) Get(key string) (interface{}, bool) {
 	return nil, false
 }
 
-func (ra *LimitMapArray) Contains(key string) (bool) {
-	 _, ok := ra.index[key]
+func (ra *LimitMapArray) Contains(key string) bool {
+	_, ok := ra.index[key]
 	return ok
 }
 
@@ -121,7 +121,7 @@ func (ra *LimitMapArray) Remove(key string) interface{} {
 }
 
 func (ra *LimitMapArray) IsFull() bool {
-	return ra.length == ra.capacity-1
+	return ra.length == ra.capacity
 }
 
 func (ra *LimitMapArray) IsEmpty() bool {
@@ -199,6 +199,7 @@ func (it *Iterate) Next() interface{} {
 const (
 	CoverMaxTry = 16
 )
+
 var (
 	SetFullAMapArrayErr = errors.New(`cannot set full map array`)
 )
