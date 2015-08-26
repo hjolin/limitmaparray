@@ -186,7 +186,7 @@ type Iterate struct {
 }
 
 func (it *Iterate) Next() interface{} {
-	if it.cur <= it.array.length {
+	if it.cur < it.array.length {
 		value := it.array.elements[it.cur].value
 		it.cur++
 		return value
