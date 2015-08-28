@@ -2,6 +2,7 @@
 package maparray
 
 import (
+	"fmt"
 	"errors"
 	`math/rand`
 )
@@ -13,7 +14,6 @@ func NewLimitMapArray(capacity int, scalable bool) *LimitMapArray {
 			capacity:    capacity,
 			length:      0,
 			scalable:    scalable,
-			coverMaxTry: CoverMaxTry,
 			elements:    make([]*element, capacity),
 		}
 		return array
@@ -152,15 +152,13 @@ func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
 		for i < limit {
 			idx = rand.Intn(ra.length)
 			try++
-			if _, ok = idxs[idx]; !ok && (ra.sRule == nil || ra.sRule.Check(ra.elements[idx].value)) {
+			if _, ok = idxs[idx]; !ok && (try >= maxTry || ra.sRule == nil || ra.sRule.Check(ra.elements[idx].value)) {
 				idxs[idx] = '0'
 				values[i] = ra.elements[idx].value
 				i++
 			}
-			if try >= maxTry {
-				return values[:i]
-			}
 		}
+		fmt.Println(`try=`, try)
 		return values
 	}
 }
@@ -194,9 +192,6 @@ func (it *Iterate) Next() interface{} {
 	return nil
 }
 
-const (
-	CoverMaxTry = 16
-)
 
 var (
 	SetFullAMapArrayErr = errors.New(`cannot set full map array`)
