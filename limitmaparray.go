@@ -2,19 +2,19 @@
 package maparray
 
 import (
-	"fmt"
 	"errors"
+	//"fmt"
 	`math/rand`
 )
 
 func NewLimitMapArray(capacity int, scalable bool) *LimitMapArray {
 	if capacity > 0 {
 		array := &LimitMapArray{
-			index:       make(map[string]int),
-			capacity:    capacity,
-			length:      0,
-			scalable:    scalable,
-			elements:    make([]*element, capacity),
+			index:    make(map[string]int),
+			capacity: capacity,
+			length:   0,
+			scalable: scalable,
+			elements: make([]*element, capacity),
 		}
 		return array
 	}
@@ -158,16 +158,17 @@ func (ra *LimitMapArray) Randoms(limit int, maxTry int) []interface{} {
 				i++
 			}
 		}
-		fmt.Println(`try=`, try)
 		return values
 	}
 }
 
-func (ra *LimitMapArray) Iterate() *Iterate {
-	return &Iterate{
-		cur:   0,
-		array: ra,
+func (ra *LimitMapArray) Keys() []string {
+	i, keys := 0, make([]string, ra.length)
+	for k, _ := range ra.index {
+		keys[i] = k
+		i++
 	}
+	return keys
 }
 
 type SelectRuler interface {
@@ -177,21 +178,6 @@ type SelectRuler interface {
 type CoverRuler interface {
 	ShouldCover(interface{}) bool
 }
-
-type Iterate struct {
-	cur   int
-	array *LimitMapArray
-}
-
-func (it *Iterate) Next() interface{} {
-	if it.cur < it.array.length {
-		value := it.array.elements[it.cur].value
-		it.cur++
-		return value
-	}
-	return nil
-}
-
 
 var (
 	SetFullAMapArrayErr = errors.New(`cannot set full map array`)

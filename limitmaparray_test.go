@@ -9,7 +9,7 @@ import (
 )
 
 func TestMapArray(t *testing.T) {
-	ma := NewLimitMapArray(5, true)
+	ma := NewLimitMapArray(2048, false)
 	gorotines := 100000
 	over := make(chan byte, 100)
 	lock := &sync.Mutex{}
@@ -19,19 +19,25 @@ func TestMapArray(t *testing.T) {
 			lock.Lock()
 			ma.Set(strconv.FormatInt(int64(i), 10), i)
 			lock.Unlock()
-			fmt.Println(ma.Randoms(12, 36))
+			ma.Randoms(8, 32)
 			over <- '0'
 		}(i)
 	}
 	i := 0
+	var (
+		value interface{}
+		ok    bool
+	)
 	for {
 		select {
 		case <-over:
 			i++
 			if i == gorotines {
-				it := ma.Iterate()
-				for value:= it.Next(); value!= nil; value = it.Next() {
-					fmt.Print(value, `   `)
+				keys := ma.Keys()
+				for _, key := range keys {
+					if value, ok = ma.Get(key); ok {
+						fmt.Print(value, `   `)
+					}
 				}
 				//fmt.Println()
 				fmt.Println(ma.Length())
