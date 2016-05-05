@@ -8,14 +8,14 @@ import (
 )
 
 func TestMapArray(t *testing.T) {
-	ma := NewLimitMapArray(2048, false)
-	gorotines := 200000
+	ma := NewLimitMapArray(2, true)
+	gorotines := 17
 	over := make(chan byte, 100)
 	for i := 0; i < gorotines; i++ {
 		go func(i int) {
 			//time.Sleep(time.Second * time.Duration(rand.Intn(5)))
-			ma.Set(strconv.FormatInt(int64(i), 10), i)
-			ma.Randoms(8, 32)
+			fmt.Println(ma.Set(strconv.FormatInt(int64(i), 10), i))
+			ma.Random()
 			over <- '0'
 		}(i)
 	}
@@ -36,10 +36,12 @@ func TestMapArray(t *testing.T) {
 					}
 				}
 				fmt.Println(ma.Length())
-				for key := range ma.index {
-					ma.Remove(key)
-				}
-				fmt.Println(ma.Length())
+				//				for key := range ma.index {
+				//					ma.Remove(key)
+				//				}
+
+				fmt.Println(ma.Keys())
+				fmt.Println(ma.Length(), ma.Capcity())
 				return
 			}
 		}
