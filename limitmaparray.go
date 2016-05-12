@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-func NewMapArray(capacity int) *LimitMapArray {
+func NewLimitMapArray(capacity int) *LimitMapArray {
 	array := &LimitMapArray{
 		index:    make(map[string]int),
 		length:   0,
