@@ -6,25 +6,22 @@ import (
 	"sync"
 )
 
-func NewLimitMapArray(capacity int, scalable bool) *LimitMapArray {
-	if capacity > 0 {
-		array := &LimitMapArray{
-			index:    make(map[string]int),
-			length:   0,
-			scalable: scalable,
-			elements: make([]*element, capacity),
-			lock:     &sync.RWMutex{},
-		}
-		return array
+func NewMapArray(capacity int) *LimitMapArray {
+	array := &LimitMapArray{
+		index:    make(map[string]int),
+		length:   0,
+		capcity:  capacity,
+		elements: make([]*element, 1),
+		lock:     &sync.RWMutex{},
 	}
-	return nil
+	return array
 }
 
 type LimitMapArray struct {
 	index    map[string]int
-	length   int
-	scalable bool
 	elements []*element
+	length   int
+	capcity  int
 	lock     *sync.RWMutex
 }
 
@@ -39,9 +36,11 @@ func (this *LimitMapArray) Length() int {
 	return this.length
 }
 
-func (this *LimitMapArray) Capcity() int {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
+func (this *LimitMapArray) Capacity() int {
+	return this.capcity
+}
+
+func (this *LimitMapArray) realCapacity() int {
 	return cap(this.elements)
 }
 
@@ -49,12 +48,20 @@ func (this *LimitMapArray) Set(key string, value interface{}) error {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if _, ok := this.index[key]; !ok {
+		if this.capcity > 0 && this.length >= this.capcity {
+			idx := rand.Intn(this.length)
+			delete(this.index, this.elements[idx].key)
+			this.index[key] = idx
+			this.elements[idx].key = key
+			this.elements[idx].value = value
+			return LimitMapArrayFullErr
+		}
 		if this.length >= cap(this.elements) {
-			if this.scalable {
-				this.elements = append(this.elements, this.elements...)
-			} else {
-				return SetFullAMapArrayErr
+			var size int = this.length << 1
+			if this.capcity > 0 && size > this.capcity {
+				size = this.capcity
 			}
+			this.resize(size)
 		}
 		this.index[key] = this.length
 		this.elements[this.length] = &element{key, value}
@@ -66,13 +73,22 @@ func (this *LimitMapArray) Set(key string, value interface{}) error {
 	}
 }
 
-func (this *LimitMapArray) Get(key string) (interface{}, bool) {
+func (this *LimitMapArray) GetByKey(key string) interface{} {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
 	if idx, ok := this.index[key]; ok {
-		return this.elements[idx].value, true
+		return this.elements[idx].value
 	}
-	return nil, false
+	return nil
+}
+
+func (this *LimitMapArray) GetByIndex(idx int) (string, interface{}) {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	if idx >= 0 && idx < this.length {
+		return this.elements[idx].key, this.elements[idx].value
+	}
+	return ``, nil
 }
 
 func (this *LimitMapArray) Contains(key string) bool {
@@ -82,29 +98,53 @@ func (this *LimitMapArray) Contains(key string) bool {
 	return ok
 }
 
-func (this *LimitMapArray) Remove(key string) interface{} {
+func (this *LimitMapArray) RemoveByKey(key string) interface{} {
 	this.lock.Lock()
 	defer this.lock.Unlock()
 	if idx, ok := this.index[key]; ok {
-		value := this.elements[idx].value
-		delete(this.index, key)
-		if idx == this.length-1 {
-			this.length--
-		} else {
+		element := this.remove(idx)
+		return element.value
+	}
+	return nil
+}
+
+func (this *LimitMapArray) RemoveByIndex(idx int) (string, interface{}) {
+	this.lock.Lock()
+	defer this.lock.Unlock()
+	if element := this.remove(idx); element != nil {
+		return element.key, element.value
+	}
+	return ``, nil
+}
+
+func (this *LimitMapArray) remove(idx int) *element {
+	if idx >= 0 && idx < this.length {
+		element := this.elements[idx]
+		delete(this.index, element.key)
+		if idx != this.length-1 {
 			last := this.elements[this.length-1]
 			this.index[last.key] = idx
 			this.elements[idx] = last
-			this.length--
 		}
-		return value
+		this.length--
+		if this.length < cap(this.elements)>>1 {
+			this.resize(cap(this.elements) >> 1)
+		}
+		return element
 	}
 	return nil
+}
+
+func (this *LimitMapArray) resize(capcity int) {
+	newElements := make([]*element, capcity)
+	copy(newElements, this.elements)
+	this.elements = newElements
 }
 
 func (this *LimitMapArray) Full() bool {
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	return !this.scalable && this.length == cap(this.elements)
+	return this.capcity > 0 && this.length == this.capcity
 }
 
 func (this *LimitMapArray) Empty() bool {
@@ -113,24 +153,24 @@ func (this *LimitMapArray) Empty() bool {
 	return this.length == 0
 }
 
-func (this *LimitMapArray) Random() (string, interface{}) {
-	this.lock.RLock()
-	defer this.lock.RUnlock()
-	idx := rand.Int31n(int32(this.length))
-	return this.elements[idx].key, this.elements[idx].value
-}
-
 func (this *LimitMapArray) Keys() []string {
-	i, keys := 0, make([]string, this.length)
 	this.lock.RLock()
 	defer this.lock.RUnlock()
-	for k, _ := range this.index {
-		keys[i] = k
-		i++
+	values := make([]string, this.length)
+	for i := 0; i < this.length; i++ {
+		values[i] = this.elements[i].key
 	}
-	return keys
+	return values
 }
 
-var (
-	SetFullAMapArrayErr = errors.New(`cannot set full map array`)
-)
+func (this *LimitMapArray) Values() []interface{} {
+	this.lock.RLock()
+	defer this.lock.RUnlock()
+	values := make([]interface{}, this.length)
+	for i := 0; i < this.length; i++ {
+		values[i] = this.elements[i].value
+	}
+	return values
+}
+
+var LimitMapArrayFullErr = errors.New(`cannot set full map array`)
