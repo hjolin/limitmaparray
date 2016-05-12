@@ -40,7 +40,7 @@ func (this *LimitMapArray) Capacity() int {
 	return this.capcity
 }
 
-func (this *LimitMapArray) realCapacity() int {
+func (this *LimitMapArray) RealCapacity() int {
 	return cap(this.elements)
 }
 
